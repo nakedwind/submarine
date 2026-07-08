@@ -604,6 +604,7 @@ function initAudioGraph(){
    ===================================================================== */
 var muffleReady = false;   // 真濾波器是否已接上
 var musicFilter = null;
+var musicFilter2 = null;
 
 function setupMuffle(){
   if (muffleReady) return;
@@ -611,13 +612,18 @@ function setupMuffle(){
   initAudioGraph();
   if (!audioCtx) return;
   try {
-    // 把音樂的輸出改道：音樂 → 低通濾波器 → 喇叭
+    // 把音樂的輸出改道：音樂 → 濾波器A → 濾波器B → 喇叭
+    // 串兩層低通濾波器，高音削得更乾淨，悶的感覺更明顯
     var src = audioCtx.createMediaElementSource(sounds.music);
     musicFilter = audioCtx.createBiquadFilter();
     musicFilter.type = 'lowpass';
     musicFilter.frequency.value = 20000;   // 20000Hz = 幾乎不過濾（水面）
+    musicFilter2 = audioCtx.createBiquadFilter();
+    musicFilter2.type = 'lowpass';
+    musicFilter2.frequency.value = 20000;
     src.connect(musicFilter);
-    musicFilter.connect(audioCtx.destination);
+    musicFilter.connect(musicFilter2);
+    musicFilter2.connect(audioCtx.destination);
     muffleReady = true;
   } catch (e) {}
 }
@@ -625,11 +631,12 @@ function setupMuffle(){
 /* 依層數調整悶的程度：0 = 水面（清晰），10 = 最深（最悶） */
 function setUnderwaterDepth(level){
   if (muffleReady){
-    // 真濾波：截止頻率隨深度下降（第1層約935Hz → 第10層約350Hz）
-    var freq = level <= 0 ? 20000 : Math.max(350, 1000 - level * 65);
+    // 真濾波：截止頻率隨深度下降（第1層約700Hz → 第10層約220Hz）
+    var freq = level <= 0 ? 20000 : Math.max(220, 750 - level * 55);
     // setTargetAtTime = 平滑漸變，0.35 是漸變速度，不會突然跳一下
     musicFilter.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.35);
-    sounds.music.volume = level <= 0 ? 0.15 : 0.12;
+    musicFilter2.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.35);
+    sounds.music.volume = level <= 0 ? 0.15 : 0.11;
   } else {
     // 備援（本機 file://）：音樂壓小聲，靠深水環境音營造悶感
     sounds.music.volume = level <= 0 ? 0.15 : 0.06;
