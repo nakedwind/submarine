@@ -32,17 +32,35 @@
     width: 1080px; height: 1920px;
     transform-origin: 50% 42%;              /* 以畫面中間偏上為中心往後拉 */
     transition: transform 1.5s ease-in-out;
+    z-index: 0;
   }
   #world.zoomout { transform: scale(0.9); }
+  /* 壓黑層在 world 裡（才能讓潛水艇/寶箱浮在它上面），
+     鏡頭拉遠時用反向放大抵銷縮小，看起來就像沒有跟著縮 */
+  #depthTint { transform-origin: 50% 42%; }
+  #world.zoomout #depthTint { transform: scale(1.1112); }
   #stage { background: #051428; }           /* 拉遠時邊緣露出的底色（深海色） */
 
   /* ===== 鐵達尼號：最深層的大獎，平常藏在畫面底下 ===== */
   #titanic {
     position: absolute;
-    left: 0; top: 1930px;      /* 藏在畫面下方；升起時由 JS 改 top */
+    left: 0; top: 2450px;      /* 藏在畫面下方（130% 縮放的上緣也要在畫面外）；升起時由 JS 改 top */
     width: 1080px;             /* 素材原始尺寸 1080x2084 */
-    z-index: 1;                /* 在深度濾鏡之上（不被壓黑）、潛水艇之下 */
+    z-index: 2;                /* 保持在深度濾鏡之上，鐵達尼號本體不被壓黑 */
     pointer-events: none;
+    transform-origin: 50% 50%;
+    transform: scale(1.4445);  /* 登場時的起始大小（換算鏡頭縮小後約 130%） */
+  }
+
+  /* 鏡頭拉遠時：礁岩軌道靠左貼齊（抵銷縮小造成的左邊縫隙）、潛水艇縮小到約 70% */
+  #world.zoomout #reefStrip,
+  #world.zoomout #chestStrip { left: -60px; }
+  /* 最終下潛：第九層按下 SPIN 就開始，潛水艇用整段演出的時間慢慢縮小到約 50%
+     （寫成 .diving.finalShrink 是為了蓋過 .diving 的旋轉設定） */
+  #sub.diving.finalShrink {
+    transform: rotate(-25deg) scale(0.556);
+    transition: left 1s ease-in-out, top 1s ease-in-out, transform 5.1s ease-in-out,
+                filter 0.3s, opacity 0.5s;
   }
 
   /* ===== 背景圖（1080x3708 長條圖，下潛時往上捲動） ===== */
@@ -114,13 +132,13 @@
   }
   /* 下潛姿態：機頭朝左下傾斜，移到畫面偏右上 */
   #sub {
-    z-index: 2;                 /* 在深度濾鏡之上，不被壓黑 */
+    z-index: 3;                 /* 在深度濾鏡之上，不被壓黑 */
     transition: left 1s ease-in-out, top 1s ease-in-out, transform 1s ease-in-out,
                 filter 0.3s, opacity 0.5s;
   }
-  #seaFront { z-index: 3; }     /* 水面前層仍要蓋住潛水艇，維持泡在水裡的感覺 */
-  #beam, #beamGlow { z-index: 2; }   /* 探照燈也不被壓黑 */
-  #fxLayer { z-index: 4; }      /* 爆炸特效在最上層 */
+  #seaFront { z-index: 4; }     /* 水面前層仍要蓋住潛水艇，維持泡在水裡的感覺 */
+  #beam, #beamGlow { z-index: 3; }   /* 探照燈也不被壓黑 */
+  #fxLayer { z-index: 5; }      /* 爆炸特效在最上層 */
   #sub.diving {
     left: 394px; top: 27px;
     transform: rotate(-25deg);
@@ -203,7 +221,7 @@
     left: 0; top: 1920px;
     width: 409px; height: 5760px;
     pointer-events: none;
-    z-index: 2;
+    z-index: 3;
   }
   #chestStrip .chest {
     position: absolute;
@@ -218,6 +236,7 @@
     background: #061228;
     mix-blend-mode: multiply;
     opacity: 0;
+    z-index: 1;                /* 壓黑背景；鐵達尼號、潛水艇、寶箱與探照燈維持在上方 */
     pointer-events: none;
   }
 
@@ -278,9 +297,25 @@
   .fish { position: absolute; }
   .bubble { position: absolute; }
 
+  /* ===== 測試用按鈕（右上角） ===== */
+  #btnTest {
+    position: absolute;
+    right: 20px; top: 30px;
+    z-index: 100;
+    background: rgba(180, 40, 40, 0.85);
+    border: 2px solid #ff9a9a;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 28px; font-weight: bold;
+    padding: 10px 20px;
+    cursor: pointer;
+  }
+  #btnTest:active { filter: brightness(1.3); }
+
   /* ===== 左上角：玩家資訊與餘額 ===== */
   #topBar {
     position: absolute; left: 20px; top: 25px;
+    z-index: 90;
     background: rgba(10, 25, 50, 0.75);
     border-radius: 14px;
     padding: 12px 26px;
@@ -292,14 +327,16 @@
   /* ===== 獎金表（10 層） ===== */
   #prizePanel {
     position: absolute;
-    left: 34px; top: 1080px;
-    width: 1013px; height: 441px;
+    left: 16px; top: 1001px;
+    width: 1048px; height: 550px;  /* 跟 image/UI-box.png 原始尺寸一致，避免拉伸變形 */
+    z-index: 90;
     pointer-events: none;
   }
   #ladder {
     position: absolute;
-    left: 65px; top: 1100px;
-    width: 950px; height: 310px;
+    left: 58px; top: 1140px;
+    width: 964px; height: 270px;
+    z-index: 91;
     display: flex; flex-wrap: wrap;
     gap: 16px 30px;
     justify-content: center;      /* 置中排列：短金額一行三個、長金額自動變兩個 */
@@ -332,7 +369,8 @@
   /* ===== 目前累積獎金（金色膠囊） ===== */
   #winPill {
     position: absolute;
-    left: 50%; top: 1433px;
+    left: 50%; top: 1443px;
+    z-index: 91;
     transform: translateX(-50%);
     min-width: 610px;
     background: transparent;
@@ -359,6 +397,7 @@
     position: absolute;
     left: 0; top: 1600px;
     width: 1080px; height: 240px;
+    z-index: 100;
   }
   #controls img { position: absolute; cursor: pointer; }
   #controls img:active { filter: brightness(1.3); }
@@ -414,7 +453,7 @@
     border-radius: 20px;
     padding: 14px;
     display: none;                /* 平常隱藏 */
-    z-index: 10;
+    z-index: 110;
   }
   #menuPanel.open { display: block; }
   #menuPanel .item {
@@ -439,7 +478,7 @@
     font-size: 34px;
     line-height: 1.7;
     display: none;
-    z-index: 11;
+    z-index: 120;
   }
   #rulesBox.open { display: block; }
   #rulesBox h2 { color: #ffd94d; margin-bottom: 16px; font-size: 44px; }
@@ -454,7 +493,7 @@
     padding: 36px 40px;
     color: #fff;
     display: none;
-    z-index: 11;
+    z-index: 120;
   }
   #probBox.open { display: block; }
   #probBox h2 { color: #ffd94d; margin-bottom: 20px; font-size: 44px; }
@@ -508,6 +547,7 @@
     position: absolute;
     left: 0; top: 1856px;
     width: 1080px;
+    z-index: 90;
     display: flex; justify-content: space-between;
     padding: 0 30px;
     font-size: 40px; font-weight: bold;
@@ -520,6 +560,7 @@
   #message {
     position: absolute;
     left: 50%; top: 860px;
+    z-index: 95;
     transform: translateX(-50%) scale(0);
     font-size: 76px; font-weight: bold;
     color: #ffd94d;
@@ -539,11 +580,64 @@
     100% { transform: translateX(-50%) scale(1); opacity: 0; }
   }
 
+  /* ===== 得分時壓黑全畫面：讓獎勵框聚焦 ===== */
+  #winDimmer {
+    position: absolute;
+    left: 0; top: 0;
+    width: 1080px; height: 1920px;
+    z-index: 95;
+    background: rgba(0,0,0,0.7);
+    opacity: 0;
+    pointer-events: none;
+  }
+  #winDimmer.show { animation: winDim 3s ease forwards; }
+  @keyframes winDim {
+    0%   { opacity: 0; }
+    8%   { opacity: 1; }
+    91%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ===== 得分彈窗：CASH OUT 得分時顯示 ===== */
+  #winBox {
+    position: absolute;
+    left: 50%; top: 720px;
+    width: 975px; height: 417px;   /* 跟 image/win-box.png 原始尺寸一致 */
+    z-index: 96;
+    transform: translateX(-50%) scale(0);
+    background: url("image/win-box.png") center / 975px 417px no-repeat;
+    pointer-events: none;
+    opacity: 0;
+  }
+  #winBoxAmount {
+    position: absolute;
+    left: 70px; right: 70px; top: 150px;
+    text-align: center;
+    font-size: 92px;
+    line-height: 150px;
+    font-weight: 900;
+    color: #ffd94d;
+    text-shadow:
+      0 5px 0 rgba(80,45,0,0.85),
+      0 8px 18px rgba(0,0,0,0.6),
+      0 0 34px rgba(255,210,70,0.7);
+    white-space: nowrap;
+  }
+  #winBox.show { animation: winBoxPop 3s ease forwards; }
+  @keyframes winBoxPop {
+    0%   { transform: translateX(-50%) scale(0.65); opacity: 0; }
+    8%   { transform: translateX(-50%) scale(1.05); opacity: 1; }
+    13%  { transform: translateX(-50%) scale(1); opacity: 1; }
+    91%  { transform: translateX(-50%) scale(1); opacity: 1; }
+    100% { transform: translateX(-50%) scale(0.96); opacity: 0; }
+  }
+
   /* ===== 寶箱（CASH OUT 成功時跳出來） ===== */
   #treasure {
     position: absolute;
     left: 50%; top: 780px;
     width: 315px;              /* 素材原始尺寸 */
+    z-index: 95;
     transform: translateX(-50%) scale(0);
     pointer-events: none;
   }
@@ -560,8 +654,8 @@
 <body>
 
 <div id="stage">
+  <img id="bg" src="image/bg.png" alt=""><!-- 背景放在 world 外：鏡頭拉遠時不縮小 -->
   <div id="world"><!-- 場景容器：鏡頭拉遠時整體縮小，UI 不受影響 -->
-  <img id="bg" src="image/bg.png" alt="">
 
   <!-- 海面（後層，潛水艇會浮在它前面） -->
   <div class="sea-strip" id="seaBack">
@@ -599,6 +693,9 @@
   <div id="fxLayer"></div>
   </div><!-- /world -->
 
+  <!-- 測試用按鈕：跳到第9層，下一次SPIN必成功（正式上線前把這顆和相關程式拿掉） -->
+  <div id="btnTest">測試 9→10</div>
+
   <div id="topBar">
     <div class="name">DEMO PLAYER</div>
     <div class="money">$<span id="topBalance">0</span></div>
@@ -610,6 +707,8 @@
   <div id="winPill"><span class="coin"></span><span id="winAmount">0.00</span></div>
 
   <img id="treasure" src="image/treasure.png" alt="">
+  <div id="winDimmer"></div>
+  <div id="winBox"><div id="winBoxAmount">0.00</div></div>
   <div id="message"></div>
 
   <div id="controls">
@@ -705,10 +804,12 @@ var sounds = {
   deep: new Audio('music/water-noises.mp3'),
   dive: new Audio('music/dive.mp3'),
   explosion: new Audio('music/explosion.mp3'),
+  bonus: new Audio('music/cartoon-music-game-sfx-video-game-bonus.mp3'),
   seagull1: new Audio('music/sound_garage-seagulls01.mp3'),
   seagull2: new Audio('music/sound_garage-seagulls02.mp3')
 };
 sounds.explosion.volume = 0.7;
+sounds.bonus.volume = 0.6;
 sounds.seagull1.volume = 0.275;
 sounds.seagull2.volume = 0.275;
 sounds.music.loop = true;
@@ -948,6 +1049,25 @@ function showMessage(text, bad){
   m.classList.add('show');
 }
 
+var WIN_BOX_DURATION = 3000;   // WIN 得分框＋壓黑層的顯示時間（需和 CSS 動畫秒數同步）
+function showWinBox(amount){
+  $('winBoxAmount').textContent = fmt(amount);
+  var dimmer = $('winDimmer');
+  var box = $('winBox');
+  dimmer.classList.remove('show');
+  box.classList.remove('show');
+  void dimmer.offsetWidth;   // 重新觸發壓黑動畫
+  void box.offsetWidth;   // 重新觸發得分彈窗動畫
+  dimmer.classList.add('show');
+  box.classList.add('show');
+}
+
+function playBonusSound(){
+  if (!soundOn || !audioUnlocked) return;
+  sounds.bonus.currentTime = 0;
+  safePlay(sounds.bonus);
+}
+
 /* =====================================================================
    潛水艇移動：從目前位置滑到某一層的深度
    ===================================================================== */
@@ -962,6 +1082,7 @@ function moveSubTo(level, ms, done){
   if (level <= 0){
     sub.classList.add('bobbing');
     sub.classList.remove('diving');
+    sub.classList.remove('finalShrink');   // 回水面：恢復原本大小
     $('beam').classList.remove('show');
     $('beamGlow').classList.remove('show');
   } else {
@@ -1007,26 +1128,24 @@ function moveBgTo(level, ms){
   // 礁岩＋寶箱軌道：下潛時整條往上抬，讓寶箱出現在畫面中上段
   var strips = [$('reefStrip'), $('chestStrip')];
   if (level <= 0){
-    // 浮回水面：top 平滑降回畫面外；捲動位移「瞬間」歸零。
-    // 歸零是 1920 的整數倍、每段圖案相同，所以畫面上看不出任何變化。
-    reefOff = 0;
-    chestOff = 0;
-    for (var i = 0; i < strips.length; i++){
-      strips[i].style.transition = 'top ' + ms + 'ms ease-in-out';   // 不含 transform
-      strips[i].style.top = '1920px';
-      strips[i].style.transform = 'translateY(0)';
-    }
+    // 浮回水面：依照離開前的深度倒捲礁岩。
+    // 例：從第3層回來，背景/海面回捲一段，礁岩再倒捲2段，視覺上就是3層距離。
+    returnReefToSurface(pendingReturnDepth || 1, ms);
+    pendingReturnDepth = 0;
   } else {
-    for (var i2 = 0; i2 < strips.length; i2++){
-      strips[i2].style.transition = 'top ' + ms + 'ms ease-in-out, transform ' + ms + 'ms ease-in-out';
-      strips[i2].style.top = '-20px';
+    if (!inFinalDive){   // 最終下潛的捲動由 finalDive 自己控制，這裡不要覆寫
+      for (var i2 = 0; i2 < strips.length; i2++){
+        strips[i2].style.transition = 'top ' + ms + 'ms ease-in-out, transform ' + ms + 'ms ease-in-out';
+        strips[i2].style.top = '-20px';
+      }
     }
     aimBeam(ms);   // 下潛時讓探照燈對準目前畫面上的寶箱
   }
 
   // 深度濾鏡：第 2 層開始，每潛一層濃度 +6%（第2層6%、第3層12%…）；回水面歸零
   var tint = $('depthTint');
-  tint.style.transition = 'opacity ' + ms + 'ms ease-in-out';
+  // transform 1.5s = 鏡頭拉遠的速度，讓反向縮放跟 world 同步抵銷
+  tint.style.transition = 'opacity ' + ms + 'ms ease-in-out, transform 1.5s ease-in-out';
   tint.style.opacity = level <= 1 ? 0 : (level - 1) * 0.06;
 }
 
@@ -1053,13 +1172,17 @@ function aimBeam(ms){
 var STEP = 1920;
 var reefOff = 0;
 var chestOff = 0;
+var pendingReturnDepth = 0;   // 回海面時要依照離開前的深度倒捲幾層礁岩
 
 // 開場時把 11 段礁岩和寶箱塞進軌道
 (function buildStrips(){
   var reefHtml = '', chestHtml = '';
   for (var k = 0; k < 11; k++){
     reefHtml += '<div class="reefBlock"><img class="reefImg" src="image/reef.png" alt=""></div>';
-    chestHtml += '<img class="chest" src="image/treasure.png" style="top:' + (705 + k * 1920) + 'px" alt="">';
+    // 寶箱只放前 9 段（k=0~8）：第 9 層下潛（最終演出）經過的礁岩上不放寶箱
+    if (k < 9){
+      chestHtml += '<img class="chest" src="image/treasure.png" style="top:' + (705 + k * 1920) + 'px" alt="">';
+    }
   }
   $('reefStrip').innerHTML = reefHtml;
   $('chestStrip').innerHTML = chestHtml;
@@ -1076,19 +1199,96 @@ function scrollReef(ms){
   chest.style.transform  = 'translateY(-' + chestOff + 'px)';
 }
 
+function returnReefToSurface(depth, ms){
+  var reef = $('reefStrip'), chest = $('chestStrip');
+  var returnSteps = Math.max(0, Math.min(CONFIG.maxLevel, depth || 1) - 1);
+  var reefTarget = reefOff - returnSteps * STEP;
+  var chestTarget = chestOff - returnSteps * STEP;
+
+  inFinalDive = false;
+  scrollAmbient(returnSteps * STEP, ms);   // 魚和泡泡也跟著上浮方向倒捲
+
+  reef.style.opacity = '1';
+  reef.style.transition = 'top ' + ms + 'ms ease-in-out, '
+                        + 'transform ' + ms + 'ms cubic-bezier(0.18, 0.68, 0.22, 1)';
+  reef.style.top = '1920px';   // 海面回來時，最後一段把礁岩帶回畫面下方
+  reef.style.transform = 'translateY(-' + reefTarget + 'px)';
+
+  chest.style.opacity = '0';   // 回捲上浮時不顯示寶箱
+  chest.style.transition = 'none';
+  chest.style.top = '1920px';
+  chest.style.transform = 'translateY(-' + chestTarget + 'px)';
+
+  setTimeout(function(){
+    reefOff = 0;
+    chestOff = 0;
+    reef.style.transition = 'none';
+    reef.style.top = '1920px';
+    reef.style.transform = 'translateY(0)';
+    reef.style.opacity = '1';
+    chest.style.transition = 'none';
+    chest.style.top = '1920px';
+    chest.style.transform = 'translateY(0)';
+    chest.style.opacity = '1';
+  }, ms + 100);
+}
+
+/* =====================================================================
+   最終下潛（9→10）：時間拉長 3 倍的三段式演出
+   第 1 段：捲第 1 次礁岩（下潛音效在 doSpin 已播第 1 次）
+   第 2 段：捲第 2 次礁岩＋播第 2 次下潛音效
+   第 3 段：礁岩邊捲邊淡出消失＋播第 3 次下潛音效 → 鐵達尼號登場
+   ===================================================================== */
+var FINAL_PHASE_MULT = 1.9;   // 最終下潛每一段 = 一般下潛時間 × 這個倍數（調節奏改這裡）
+var inFinalDive = false;      // 最終下潛中：不讓 moveBgTo 覆寫礁岩的捲動設定
+function finalDive(ms){
+  var p = ms * FINAL_PHASE_MULT;   // 每一段的長度（預設約 1.7 秒）
+  var total = p * 3;               // 三段合起來一次捲完，中間不停頓
+  inFinalDive = true;
+  sub.classList.add('finalShrink');   // 按下 SPIN 就開始，用整段時間慢慢縮小
+
+  // 礁岩＋寶箱：一口氣連續捲 3 段的距離（起步快、後段滑行），
+  // 淡出用「延遲 2p 開始」的過渡自動接上，不會中途重設動畫
+  reefOff  += STEP * 3;
+  chestOff += STEP * 3;
+  scrollAmbient(-STEP * 3, total);
+  var strips = [$('reefStrip'), $('chestStrip')];
+  var offs = [reefOff, chestOff];
+  for (var i = 0; i < strips.length; i++){
+    strips[i].style.transition = 'transform ' + total + 'ms cubic-bezier(0.3, 0.55, 0.4, 1), '
+                               + 'opacity ' + p + 'ms ease-in-out ' + (p * 2) + 'ms, '
+                               + 'left 1.5s ease-in-out';   // 鏡頭拉遠時靠左貼齊要平滑
+    strips[i].style.transform = 'translateY(-' + offs[i] + 'px)';
+    strips[i].style.opacity = '0';   // 延遲 2p 後才開始淡出（第 3 段）
+  }
+
+  setTimeout(function(){   // 第 2 段：第 2 次下潛音效
+    playDiveSound();
+    spawnDiveBubbles();
+  }, p);
+
+  setTimeout(function(){   // 第 3 段：第 3 次下潛音效 → 鐵達尼號登場
+    playDiveSound();
+    spawnDiveBubbles();
+    showTitanic(p);   // 鐵達尼號用 p×1.6 的時間緩緩升起，更有份量
+  }, p * 2);
+}
+
 /* =====================================================================
    鐵達尼號（第 10 層大獎）：從畫面底部升起＋鏡頭拉遠
    ===================================================================== */
 function showTitanic(ms){
   var t = $('titanic');
-  t.style.transition = 'top ' + (ms * 1.6) + 'ms ease-in-out';   // 比下潛稍慢，更有份量
-  t.style.top = '180px';                    // 升到定位：桅杆在畫面上段
+  t.style.transition = 'top ' + (ms * 1.6) + 'ms ease-in-out, transform ' + (ms * 1.6) + 'ms ease-in-out';
+  t.style.top = '60px';                     // 升到定位：桅杆在畫面上段
+  t.style.transform = 'scale(1.1112)';      // 130% → 100%（換算鏡頭縮小後剛好填滿畫面）
   $('world').classList.add('zoomout');      // 鏡頭拉遠
 }
 function hideTitanic(ms){
   var t = $('titanic');
-  t.style.transition = 'top ' + ms + 'ms ease-in-out';
-  t.style.top = '1930px';                   // 沉回畫面底下
+  t.style.transition = 'top ' + ms + 'ms ease-in-out, transform ' + ms + 'ms ease-in-out';
+  t.style.top = '2450px';                   // 沉回畫面底下（含 130% 縮放的餘裕）
+  t.style.transform = 'scale(1.4445)';      // 恢復登場前的起始大小
   $('world').classList.remove('zoomout');   // 鏡頭恢復
 }
 
@@ -1155,14 +1355,21 @@ function doSpin(){
   var ms = G.turbo ? CONFIG.diveTime / 2 : CONFIG.diveTime;
   var nextLevel = G.level + 1;
   var ok = Math.random() < CONFIG.successChance[nextLevel - 1];
+  if (G.testForceWin){ ok = true; G.testForceWin = false; }   // 測試按鈕：下一潛必成功
 
   setUnderwaterDepth(nextLevel);   // 音樂跟著變悶
 
-  // 第一次下潛礁岩正在從畫面下方升上來，不捲動；第二層開始每按一次 SPIN 循環一張
-  if (nextLevel >= 2) scrollReef(ms);
-  // 潛向最深層：鐵達尼號登場＋鏡頭拉遠
-  if (nextLevel >= CONFIG.maxLevel) showTitanic(ms);
-  moveSubTo(nextLevel, ms, function(){
+  // 9→10 的最終下潛：時間拉長 3 倍的特別演出
+  var isFinal = nextLevel >= CONFIG.maxLevel;
+  var totalMs = isFinal ? ms * FINAL_PHASE_MULT * 3 : ms;
+
+  if (isFinal){
+    finalDive(ms);   // 三段式演出：捲兩次礁岩 → 礁岩淡出 → 鐵達尼號登場
+  } else if (nextLevel >= 2){
+    // 第一次下潛礁岩正在從畫面下方升上來，不捲動；第二層開始每按一次 SPIN 循環一張
+    scrollReef(ms);
+  }
+  moveSubTo(nextLevel, totalMs, function(){
     if (ok){
       playTone(520 + nextLevel * 35, 0.18, 'sine');
       G.level = nextLevel;
@@ -1170,7 +1377,7 @@ function doSpin(){
       if (G.level >= CONFIG.maxLevel){
         // 潛到最深層：直接把獎金全收
         showMessage('抵達海底！');
-        setTimeout(function(){ cashOut(1); }, 2400);   // 多停一下，讓玩家看清楚鐵達尼號
+        setTimeout(function(){ cashOut(1); }, 8000);   // 停 8 秒，讓玩家好好看鐵達尼號
       }
       G.busy = false;
       refresh();
@@ -1183,7 +1390,7 @@ function doSpin(){
       setTimeout(function(){
         sub.classList.remove('shake');
         explodeSub();
-        setTimeout(function(){ endRound(0); }, 900);
+        setTimeout(function(){ endRound(nextLevel); }, 900);
       }, 500);
     }
   });
@@ -1280,7 +1487,7 @@ function cashOut(portion){
   if (!G.inRound || G.win <= 0) return;
 
   var got = G.win * portion;
-  playTone(portion === 1 ? 880 : 660, 0.45, 'triangle');
+  playBonusSound();
   G.balance += got;
   G.win -= got;
 
@@ -1288,26 +1495,37 @@ function cashOut(portion){
     $('treasure').classList.remove('show');
     void $('treasure').offsetWidth;
     $('treasure').classList.add('show');
-    showMessage('+' + fmt(got));
-    endRound(null);
+    showWinBox(got);
+    G.busy = true;   // WIN 播放期間先鎖住操作，等得分框結束才浮回水面
+    refresh();
+    setTimeout(function(){ endRound(); }, WIN_BOX_DURATION);
   } else {
-    showMessage('+' + fmt(got));   // 收一半，繼續潛
+    showWinBox(got);   // 收一半，繼續潛
     refresh();
   }
 }
 
+function returnTimeFromDepth(level){
+  var depth = Math.max(1, Math.min(CONFIG.maxLevel, level || 1));
+  return 700 + depth * 400;   // 第1層約1.1秒；第10層約4.7秒，越深回海面越久
+}
+
 /* ===== 一局結束：潛水艇浮回水面 ===== */
-function endRound(){
+function endRound(returnFromLevel){
+  var depth = returnFromLevel || G.level || 1;
+  var returnMs = returnTimeFromDepth(depth);
+  pendingReturnDepth = depth;
   G.busy = true;
   G.inRound = false;
   G.level = 0;
   G.win = 0;
   G.auto = false;
   $('btnAuto').classList.remove('on');
+  playDiveSound();
   updateAmbience(false);
   refresh();
 
-  moveSubTo(0, 1100, function(){
+  moveSubTo(0, returnMs, function(){
     sub.style.transition = '';
     sub.style.opacity = '1';   // 爆炸後在水面重新出現（淡入）
     sub.classList.add('bobbing');
@@ -1336,6 +1554,33 @@ $('btnAuto').addEventListener('click', function(){
   this.classList.toggle('on', G.auto);
   if (G.auto && !G.busy) doSpin();
 });
+/* ===== 測試按鈕：直接跳到第 9 層，下一次 SPIN 必成功（看 9→10 的表演） ===== */
+$('btnTest').addEventListener('click', function(){
+  if (G.busy) return;
+  var bet = CONFIG.betOptions[G.betIndex];
+  if (!G.inRound){
+    if (G.balance < bet){ showMessage('餘額不足', true); return; }
+    G.balance -= bet;
+  }
+  G.inRound = true;
+  G.level = 9;
+  G.win = bet * CONFIG.multipliers[8];
+  G.testForceWin = true;
+
+  // 場景瞬間定位到第 9 層的狀態（不播動畫）
+  reefOff  = 8 * 1920;   // 第 2~9 層共捲了 8 次
+  chestOff = 8 * 1920;
+  var reef = $('reefStrip'), chest = $('chestStrip');
+  reef.style.transition = 'none';
+  reef.style.transform  = 'translateY(-' + reefOff + 'px)';
+  chest.style.transition = 'none';
+  chest.style.transform  = 'translateY(-' + chestOff + 'px)';
+  moveSubTo(9, 0, null);   // 背景、海面、濾鏡、潛水艇姿態、探照燈一次到位
+
+  showMessage('已跳到第 9 層');
+  refresh();
+});
+
 /* ===== 漢堡選單 ===== */
 $('btnMenu').addEventListener('click', function(e){
   e.stopPropagation();   // 不要觸發下面「點其他地方就關閉」的規則
