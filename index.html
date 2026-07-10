@@ -26,6 +26,25 @@
     /* 實際縮放比例由 JS 計算 */
   }
 
+  /* ===== 場景容器：鏡頭拉遠（第10層鐵達尼號登場）時整體縮小 ===== */
+  #world {
+    position: absolute; left: 0; top: 0;
+    width: 1080px; height: 1920px;
+    transform-origin: 50% 42%;              /* 以畫面中間偏上為中心往後拉 */
+    transition: transform 1.5s ease-in-out;
+  }
+  #world.zoomout { transform: scale(0.9); }
+  #stage { background: #051428; }           /* 拉遠時邊緣露出的底色（深海色） */
+
+  /* ===== 鐵達尼號：最深層的大獎，平常藏在畫面底下 ===== */
+  #titanic {
+    position: absolute;
+    left: 0; top: 1930px;      /* 藏在畫面下方；升起時由 JS 改 top */
+    width: 1080px;             /* 素材原始尺寸 1080x2084 */
+    z-index: 1;                /* 在深度濾鏡之上（不被壓黑）、潛水艇之下 */
+    pointer-events: none;
+  }
+
   /* ===== 背景圖（1080x3708 長條圖，下潛時往上捲動） ===== */
   #bg {
     position: absolute; left: 0; top: 0;
@@ -38,13 +57,46 @@
     width: 4320px;
     display: flex;
   }
-  .sea-strip img { width: 2160px; height: auto; flex: 0 0 2160px; }
+  .sea-strip img { width: 2160px; height: auto; flex: 0 0 2160px; margin-right: -2px; }
   /* 兩層海面都用素材原始高度，不再拉伸變形 */
-  #seaBack  { top: 630px; height: 109px; opacity: 0.9; animation: seaMove 14s linear infinite; }
-  #seaFront { top: 680px; height: 73px;  animation: seaMove 9s linear infinite reverse; }
+  #seaBack  { top: 630px; height: 109px; opacity: 0.9; animation: seaMove 36s linear infinite; }
+  #seaFront { top: 680px; height: 73px;  animation: seaMove 24s linear infinite reverse; }
   @keyframes seaMove {
     from { transform: translateX(0); }
-    to   { transform: translateX(-2160px); }
+    to   { transform: translateX(-2158px); }
+  }
+
+  /* ===== 陽光透進海裡的光束（初始畫面，海面正下方） ===== */
+  #lightRays {
+    position: absolute;
+    left: 0; top: 738px;       /* 從海面波浪下緣開始 */
+    width: 1080px; height: 950px;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .lightray {
+    position: absolute;
+    top: -80px;
+    height: 1050px;
+    background: linear-gradient(to bottom,
+      rgba(255, 252, 224, 0.42),
+      rgba(220, 245, 255, 0.18) 45%,
+      rgba(220, 245, 255, 0) 80%);
+    filter: blur(22px);                /* 大幅模糊：邊緣化開變柔光 */
+    mix-blend-mode: screen;            /* 濾色：只會讓畫面變亮，像光 */
+    animation: raySway 14s ease-in-out infinite;
+  }
+  /* 每道光的位置、寬度、節奏都不同，看起來比較自然 */
+  /* 週期取互相不成倍數的秒數＋起點大幅錯開，避免幾道光同時亮同時暗 */
+  .lightray:nth-child(1) { left: 120px; width: 80px;  animation-delay: -2s;    animation-duration: 11s; }
+  .lightray:nth-child(2) { left: 300px; width: 140px; animation-delay: -11.5s; animation-duration: 17s; }
+  .lightray:nth-child(3) { left: 520px; width: 65px;  animation-delay: -6.3s;  animation-duration: 13s; }
+  .lightray:nth-child(4) { left: 680px; width: 120px; animation-delay: -16.8s; animation-duration: 21s; }
+  .lightray:nth-child(5) { left: 880px; width: 90px;  animation-delay: -9.1s;  animation-duration: 25s; }
+  /* 忽明忽暗 ＋ 緩緩左右飄移（角度也微微擺動，像水波折射） */
+  @keyframes raySway {
+    0%, 100% { opacity: 0; transform: translateX(-35px) skewX(-14deg); }
+    50%      { opacity: 0.95; transform: translateX(35px)  skewX(-10deg); }
   }
 
   /* ===== 潛水艇 ===== */
@@ -238,18 +290,23 @@
   #topBar .money { font-size: 34px; font-weight: bold; margin-top: 2px; }
 
   /* ===== 獎金表（10 層） ===== */
+  #prizePanel {
+    position: absolute;
+    left: 34px; top: 1080px;
+    width: 1013px; height: 441px;
+    pointer-events: none;
+  }
   #ladder {
     position: absolute;
-    left: 60px; top: 1080px;
-    width: 960px;
+    left: 65px; top: 1100px;
+    width: 950px; height: 310px;
     display: flex; flex-wrap: wrap;
     gap: 16px 30px;
     justify-content: center;      /* 置中排列：短金額一行三個、長金額自動變兩個 */
     align-content: center;
-    background: rgba(10, 30, 70, 0.35);
-    border: 3px solid rgba(130, 170, 230, 0.35);
-    border-radius: 26px;
-    padding: 26px 30px;
+    background: transparent;
+    border: 0;
+    padding: 22px 30px;
   }
   .rung {
     font-size: 40px;
@@ -275,12 +332,13 @@
   /* ===== 目前累積獎金（金色膠囊） ===== */
   #winPill {
     position: absolute;
-    left: 50%; top: 1470px;
+    left: 50%; top: 1433px;
     transform: translateX(-50%);
-    background: linear-gradient(180deg, #1d2f5e, #101c40);
-    border: 4px solid #ffcf3f;
-    border-radius: 60px;
-    padding: 14px 60px;
+    min-width: 610px;
+    background: transparent;
+    border: 0;
+    padding: 10px 50px;
+    text-align: center;
     font-size: 52px;
     font-weight: bold;
     color: #ffd94d;
@@ -385,6 +443,55 @@
   }
   #rulesBox.open { display: block; }
   #rulesBox h2 { color: #ffd94d; margin-bottom: 16px; font-size: 44px; }
+  /* ===== 機率調整面板 ===== */
+  #probBox {
+    position: absolute;
+    left: 90px; top: 330px;
+    width: 900px;
+    background: rgba(12, 26, 54, 0.97);
+    border: 4px solid #ffcf3f;
+    border-radius: 24px;
+    padding: 36px 40px;
+    color: #fff;
+    display: none;
+    z-index: 11;
+  }
+  #probBox.open { display: block; }
+  #probBox h2 { color: #ffd94d; margin-bottom: 20px; font-size: 44px; }
+  .probRow {
+    display: flex; align-items: center;
+    gap: 20px;
+    margin-bottom: 10px;
+    font-size: 30px; font-weight: bold;
+  }
+  .probRow .plv { width: 130px; color: #9db1d6; }
+  .probRow input[type=range] {
+    flex: 1;
+    height: 40px;          /* 加高，手機比較好拉 */
+  }
+  .probRow .pval { width: 110px; text-align: right; color: #ffd94d; }
+  #probBox .probBtns {
+    display: flex; gap: 20px;
+    margin-top: 26px;
+  }
+  #probBox .pbtn {
+    flex: 1;
+    text-align: center;
+    background: linear-gradient(180deg, #4a5f8a, #24345c);
+    border: 3px solid #9db1d6;
+    color: #fff;
+    border-radius: 14px;
+    padding: 16px;
+    font-size: 30px; font-weight: bold;
+    cursor: pointer;
+  }
+  #probBox .pbtn:active { filter: brightness(1.3); }
+  #probBox .pbtn.gold {
+    background: linear-gradient(180deg, #ffcf3f, #d99a00);
+    border-color: #ffe28a;
+    color: #3a2600;
+  }
+
   #rulesBox .close {
     margin-top: 24px;
     text-align: center;
@@ -453,6 +560,7 @@
 <body>
 
 <div id="stage">
+  <div id="world"><!-- 場景容器：鏡頭拉遠時整體縮小，UI 不受影響 -->
   <img id="bg" src="image/bg.png" alt="">
 
   <!-- 海面（後層，潛水艇會浮在它前面） -->
@@ -467,9 +575,21 @@
     <img src="image/sea_surface.png" alt=""><img src="image/sea_surface.png" alt="">
   </div>
 
+  <!-- 陽光透進海裡的光束 -->
+  <div id="lightRays">
+    <div class="lightray"></div>
+    <div class="lightray"></div>
+    <div class="lightray"></div>
+    <div class="lightray"></div>
+    <div class="lightray"></div>
+  </div>
+
   <!-- 礁岩與寶箱的段落由 JS 產生（11 段，夠潛 10 層不用中途歸位） -->
   <div id="reefStrip"></div>
   <div id="chestStrip"></div>
+
+  <!-- 鐵達尼號：第 10 層（最大獎）從畫面底部升起 -->
+  <img id="titanic" src="image/Titanic.png" alt="">
 
   <div id="beam"><div class="cone"></div></div>
   <div id="beamGlow"></div>
@@ -477,12 +597,14 @@
   <div id="bubbleLayer"></div>
   <div id="depthTint"></div>
   <div id="fxLayer"></div>
+  </div><!-- /world -->
 
   <div id="topBar">
     <div class="name">DEMO PLAYER</div>
     <div class="money">$<span id="topBalance">0</span></div>
   </div>
 
+  <img id="prizePanel" src="image/UI-box.png" alt="">
   <div id="ladder"></div>
 
   <div id="winPill"><span class="coin"></span><span id="winAmount">0.00</span></div>
@@ -509,6 +631,7 @@
     <div class="item" id="menuRules">📖 規則說明</div>
     <div class="item" id="menuSound">🔊 音效：開</div>
     <div class="item" id="menuReset">💰 重置餘額</div>
+    <div class="item" id="menuProb">🎲 機率調整</div>
   </div>
 
   <div id="rulesBox">
@@ -521,6 +644,16 @@
       潛航失敗獎金歸零；抵達最深層自動全收！
     </div>
     <div class="close" id="rulesClose">關閉</div>
+  </div>
+
+  <div id="probBox">
+    <h2>機率調整</h2>
+    <div id="probRows"></div>
+    <div class="probBtns">
+      <div class="pbtn gold" id="probAll100">全部100%</div>
+      <div class="pbtn" id="probDefault">恢復預設</div>
+      <div class="pbtn" id="probClose">關閉</div>
+    </div>
   </div>
 
   <div id="moneyBar">
@@ -571,14 +704,18 @@ var sounds = {
   surface: new Audio('music/ocean-waves.mp3'),
   deep: new Audio('music/water-noises.mp3'),
   dive: new Audio('music/dive.mp3'),
-  explosion: new Audio('music/explosion.mp3')
+  explosion: new Audio('music/explosion.mp3'),
+  seagull1: new Audio('music/sound_garage-seagulls01.mp3'),
+  seagull2: new Audio('music/sound_garage-seagulls02.mp3')
 };
 sounds.explosion.volume = 0.7;
+sounds.seagull1.volume = 0.275;
+sounds.seagull2.volume = 0.275;
 sounds.music.loop = true;
 sounds.surface.loop = true;
 sounds.deep.loop = true;
 sounds.music.volume = 0.15;
-sounds.surface.volume = 0.33;
+sounds.surface.volume = 0.495;
 sounds.deep.volume = 0;
 sounds.dive.volume = 0.6;
 
@@ -695,8 +832,30 @@ function updateAmbience(underwater){
   safePlay(sounds.music);
   safePlay(sounds.surface);
   safePlay(sounds.deep);
-  sounds.surface.volume = underwater ? 0.06 : 0.33;
+  sounds.surface.volume = underwater ? 0.09 : 0.495;
   sounds.deep.volume = underwater ? 0.42 : 0;
+  if (underwater) stopSeagulls();
+}
+
+/* ===== 海鷗：只在潛水艇停留水面時，以隨機間隔播放兩種叫聲 ===== */
+var seagullTimer = null;
+function stopSeagulls(){
+  [sounds.seagull1, sounds.seagull2].forEach(function(audio){
+    audio.pause();
+    audio.currentTime = 0;
+  });
+}
+function scheduleSeagull(){
+  clearTimeout(seagullTimer);
+  var delay = 8000 + Math.random() * 12000;
+  seagullTimer = setTimeout(function(){
+    if (soundOn && audioUnlocked && !G.inRound && !G.busy && G.level === 0){
+      var gull = Math.random() < 0.5 ? sounds.seagull1 : sounds.seagull2;
+      gull.currentTime = 0;
+      safePlay(gull);
+    }
+    scheduleSeagull();
+  }, delay);
 }
 function playDiveSound(){
   if (!soundOn || !audioUnlocked) return;
@@ -819,8 +978,16 @@ function moveSubTo(level, ms, done){
 
 /* ===== 背景捲動：第一次下潛就直接捲到背景最底端，浮回水面時捲回頂端 ===== */
 var BG_SCROLL = 3708 - 1920;   // 背景比舞台高出的部分（可捲動的距離）
+var lastBgOff = 0;             // 上一次背景的捲動位置（用來算魚和泡泡要跟著移多少）
 function moveBgTo(level, ms){
   var off = (level <= 0 ? 0 : -BG_SCROLL);   // 場景整體往上捲的距離
+  // 魚和泡泡跟著場景一起被捲動（第一次下潛和浮回水面時）
+  if (off !== lastBgOff){
+    scrollAmbient(off - lastBgOff, ms);
+    lastBgOff = off;
+  }
+  // 浮回水面：鐵達尼號沉回去、鏡頭恢復
+  if (level <= 0) hideTitanic(ms);
   var bg = $('bg');
   bg.style.transition = 'top ' + ms + 'ms ease-in-out';
   bg.style.top = off + 'px';
@@ -831,6 +998,11 @@ function moveBgTo(level, ms){
   seaFront.style.transition = 'top ' + ms + 'ms ease-in-out';
   seaBack.style.top  = (630 + off) + 'px';
   seaFront.style.top = (680 + off) + 'px';
+
+  // 陽光光束跟著海面一起捲動（基準位置 738）
+  var rays = $('lightRays');
+  rays.style.transition = 'top ' + ms + 'ms ease-in-out';
+  rays.style.top = (738 + off) + 'px';
 
   // 礁岩＋寶箱軌道：下潛時整條往上抬，讓寶箱出現在畫面中上段
   var strips = [$('reefStrip'), $('chestStrip')];
@@ -897,10 +1069,63 @@ function scrollReef(ms){
   var reef = $('reefStrip'), chest = $('chestStrip');
   reefOff  += STEP;
   chestOff += STEP;
+  scrollAmbient(-STEP, ms);   // 魚和泡泡跟著礁岩一起往上捲
   reef.style.transition  = 'transform ' + ms + 'ms ease-in-out';
   reef.style.transform   = 'translateY(-' + reefOff + 'px)';
   chest.style.transition = 'transform ' + ms + 'ms ease-in-out';
   chest.style.transform  = 'translateY(-' + chestOff + 'px)';
+}
+
+/* =====================================================================
+   鐵達尼號（第 10 層大獎）：從畫面底部升起＋鏡頭拉遠
+   ===================================================================== */
+function showTitanic(ms){
+  var t = $('titanic');
+  t.style.transition = 'top ' + (ms * 1.6) + 'ms ease-in-out';   // 比下潛稍慢，更有份量
+  t.style.top = '180px';                    // 升到定位：桅杆在畫面上段
+  $('world').classList.add('zoomout');      // 鏡頭拉遠
+}
+function hideTitanic(ms){
+  var t = $('titanic');
+  t.style.transition = 'top ' + ms + 'ms ease-in-out';
+  t.style.top = '1930px';                   // 沉回畫面底下
+  $('world').classList.remove('zoomout');   // 鏡頭恢復
+}
+
+/* =====================================================================
+   下潛泡泡：從潛水艇艇身冒出一群泡泡，往上飄散後消失
+   ===================================================================== */
+function spawnDiveBubbles(){
+  var layer = $('bubbleLayer');
+  var count = 24 + Math.floor(Math.random() * 9);   // 每次 24~32 顆
+  for (var i = 0; i < count; i++){
+    (function(){
+      var img = document.createElement('img');
+      img.src = 'image/' + (Math.random() < 0.5 ? 'Bubbles.png' : 'Bubbles02.png');
+      img.className = 'bubble';
+      // 沿著艇身隨機分佈（取潛水艇目前畫面上的位置）
+      // 出現時擠在艇身中段一小塊（密集），飄的時候才往四周散開
+      var x = sub.offsetLeft + sub.offsetWidth * (0.32 + Math.random() * 0.36);
+      var y = sub.offsetTop + 160 + sub.offsetHeight * (0.30 + Math.random() * 0.35);
+      // 大小差異大：偏小顆為主，偶爾出現大顆（8px ~ 70px）
+      var s = 0.3 + Math.random() * Math.random() * 2.3;
+      img.style.left = x + 'px';
+      img.style.top = y + 'px';
+      img.style.width = (27 * s) + 'px';
+      img.style.opacity = '0.95';
+      // 一半泡泡在潛水艇後面、一半在前面（潛水艇 z-index 是 2）
+      img.style.zIndex = Math.random() < 0.5 ? '1' : '3';
+      img.style.transition = 'transform 0.9s ease-out, opacity 0.9s ease-out';
+      layer.appendChild(img);
+      // 每顆錯開一點時間才起飛，比較像自然冒出來的
+      setTimeout(function(){
+        img.style.transform = 'translate(' + (Math.random() * 260 - 130) + 'px, -'
+                                           + (200 + Math.random() * 220) + 'px)';
+        img.style.opacity = '0';
+      }, 10 + Math.random() * 180);
+      setTimeout(function(){ img.remove(); }, 1300);
+    })();
+  }
 }
 
 /* =====================================================================
@@ -923,6 +1148,7 @@ function doSpin(){
 
   G.busy = true;
   playDiveSound();
+  spawnDiveBubbles();   // 艇身冒出一群泡泡
   updateAmbience(true);
   refresh();
 
@@ -934,6 +1160,8 @@ function doSpin(){
 
   // 第一次下潛礁岩正在從畫面下方升上來，不捲動；第二層開始每按一次 SPIN 循環一張
   if (nextLevel >= 2) scrollReef(ms);
+  // 潛向最深層：鐵達尼號登場＋鏡頭拉遠
+  if (nextLevel >= CONFIG.maxLevel) showTitanic(ms);
   moveSubTo(nextLevel, ms, function(){
     if (ok){
       playTone(520 + nextLevel * 35, 0.18, 'sine');
@@ -942,7 +1170,7 @@ function doSpin(){
       if (G.level >= CONFIG.maxLevel){
         // 潛到最深層：直接把獎金全收
         showMessage('抵達海底！');
-        setTimeout(function(){ cashOut(1); }, 800);
+        setTimeout(function(){ cashOut(1); }, 2400);   // 多停一下，讓玩家看清楚鐵達尼號
       }
       G.busy = false;
       refresh();
@@ -1131,6 +1359,45 @@ $('menuReset').addEventListener('click', function(){
   showMessage('餘額已重置');
   refresh();
 });
+/* ===== 機率調整面板 ===== */
+var DEFAULT_CHANCE = CONFIG.successChance.slice();   // 記住預設值，方便恢復
+
+function buildProbRows(){
+  var html = '';
+  for (var i = 0; i < CONFIG.maxLevel; i++){
+    var pct = Math.round(CONFIG.successChance[i] * 100);
+    html += '<div class="probRow">' +
+              '<span class="plv">第 ' + (i + 1) + ' 層</span>' +
+              '<input type="range" min="0" max="100" value="' + pct + '" data-i="' + i + '">' +
+              '<span class="pval">' + pct + '%</span>' +
+            '</div>';
+  }
+  $('probRows').innerHTML = html;
+}
+// 拉動拉桿：立刻改機率、更新百分比顯示
+$('probRows').addEventListener('input', function(e){
+  if (e.target.type !== 'range') return;
+  var i = parseInt(e.target.getAttribute('data-i'), 10);
+  CONFIG.successChance[i] = e.target.value / 100;
+  e.target.parentNode.querySelector('.pval').textContent = e.target.value + '%';
+});
+$('menuProb').addEventListener('click', function(){
+  $('menuPanel').classList.remove('open');
+  buildProbRows();
+  $('probBox').classList.add('open');
+});
+$('probAll100').addEventListener('click', function(){
+  for (var i = 0; i < CONFIG.maxLevel; i++) CONFIG.successChance[i] = 1;
+  buildProbRows();
+});
+$('probDefault').addEventListener('click', function(){
+  CONFIG.successChance = DEFAULT_CHANCE.slice();
+  buildProbRows();
+});
+$('probClose').addEventListener('click', function(){
+  $('probBox').classList.remove('open');
+});
+
 // 點選單以外的地方，自動關閉選單
 document.addEventListener('click', function(e){
   if (!$('menuPanel').contains(e.target) && e.target.id !== 'btnMenu' && !$('btnMenu').contains(e.target)){
@@ -1151,16 +1418,21 @@ var fishes = [];
 var bubbles = [];
 var lastTime = performance.now();
 
-function spawnFish(){
+function spawnFish(inField, yShift){
+  // inField = true：直接出現在畫面內（開場、捲動後補魚用）
+  //           false／不填：從畫面左右兩側游進來（平常的自然生成）
+  // yShift：整體垂直偏移，用來預先生成在畫面下方等著被捲進來
   var img = document.createElement('img');
   var toRight = Math.random() < 0.5;
   img.src = 'image/' + (Math.random() < 0.5 ? 'fishs01.png' : 'fishs02.png');
   img.className = 'fish';
   var scale = 0.6 + Math.random() * 0.9;
-  var y = 820 + Math.random() * 900;
+  // 下潛後魚群可游過整個畫面；水面時只出現在海面以下。
+  var y = G.inRound ? 60 + Math.random() * 1740 : 820 + Math.random() * 900;
+  y += (yShift || 0);   // 預先生成在畫面外（捲動時會被捲進來）
   var f = {
     el: img,
-    x: toRight ? -90 : 1170,
+    x: inField ? 60 + Math.random() * 960 : (toRight ? -90 : 1170),
     y: y,
     speed: (0.6 + Math.random() * 1.2) * (toRight ? 1 : -1),
     scale: scale
@@ -1174,15 +1446,19 @@ function spawnFish(){
   fishes.push(f);
 }
 
-function spawnBubble(){
+function spawnBubble(inField, yShift){
+  // inField = true：直接出現在畫面內；false／不填：從畫面底部升上來
+  // yShift：整體垂直偏移，用來預先生成在畫面下方等著被捲進來
   var img = document.createElement('img');
   var big = Math.random() < 0.4;
   img.src = 'image/' + (big ? 'Bubbles.png' : 'Bubbles02.png');
   img.className = 'bubble';
+  var topLimit = G.inRound ? 80 : 800;   // 水面待機時泡泡只出現在水裡
+  var yy = (inField ? topLimit + Math.random() * (1820 - topLimit) : 1880) + (yShift || 0);
   var b = {
     el: img,
     x: 60 + Math.random() * 960,
-    y: 1880,
+    y: yy,
     speed: 0.5 + Math.random() * 1.2,
     sway: Math.random() * Math.PI * 2
   };
@@ -1192,17 +1468,65 @@ function spawnBubble(){
   bubbles.push(b);
 }
 
+/* ===== 一次補一批魚和泡泡（開場用、或預先生成在畫面下方等被捲進來） =====
+   上限放寬一點：預先生成時畫面上的舊魚還沒被捲走，兩批會短暫共存，
+   捲動結束後舊的會被清掉，數量就回到正常。 */
+function seedAmbient(nFish, nBubbles, yShift){
+  for (var i = 0; i < nFish; i++){
+    if (fishes.length < 14) spawnFish(true, yShift);
+  }
+  for (var j = 0; j < nBubbles; j++){
+    if (bubbles.length < 40) spawnBubble(true, yShift);
+  }
+}
+
+/* ===== 場景捲動時，魚和泡泡跟著被捲動 =====
+   捲動的進度曲線用跟礁岩一樣的 ease-in-out，看起來完全同步 */
+var ambientScroll = { active: false, amount: 0, dur: 0, t: 0, applied: 0 };
+function scrollAmbient(amount, ms){
+  ambientScroll = { active: true, amount: amount, dur: ms, t: 0, applied: 0 };
+  if (amount < 0){
+    // 下潛：先把下一批魚和泡泡生成在畫面下方（偏移 = 捲動距離），
+    // 捲動時它們跟著整個場景一起被捲進畫面，不會憑空冒出來
+    seedAmbient(4, 8, -amount);
+  } else {
+    // 浮回水面：新內容從畫面上方進來會穿過天空，不好看，改成捲完再補
+    setTimeout(function(){ seedAmbient(4, 8, 0); }, ms + 80);
+  }
+}
+function easeInOutQuad(p){
+  return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+}
+
 function tick(now){
   // 幀率校正：以 60fps 為基準，上限 3（跟苦艾與甘露同一套做法）
   var factor = Math.min((now - lastTime) / (1000 / 60), 3);
   lastTime = now;
+
+  // 場景捲動：把這一幀該移動的距離，套用到所有魚和泡泡身上
+  if (ambientScroll.active){
+    ambientScroll.t += factor * (1000 / 60);
+    var p = Math.min(ambientScroll.t / ambientScroll.dur, 1);
+    var cur = ambientScroll.amount * easeInOutQuad(p);
+    var dy = cur - ambientScroll.applied;
+    ambientScroll.applied = cur;
+    for (var a = 0; a < fishes.length; a++){
+      fishes[a].y += dy;
+      fishes[a].el.style.top = fishes[a].y + 'px';
+    }
+    for (var c = 0; c < bubbles.length; c++){
+      bubbles[c].y += dy;   // 泡泡的畫面位置在下面的泡泡迴圈會更新
+    }
+    if (p >= 1) ambientScroll.active = false;
+  }
 
   // 魚
   for (var i = fishes.length - 1; i >= 0; i--){
     var f = fishes[i];
     f.x += f.speed * factor;
     f.el.style.left = f.x + 'px';
-    if (f.x < -120 || f.x > 1200){
+    // 捲動中暫停「超出上下界就清除」，預先生成在畫面下方的魚才不會被誤刪
+    if (f.x < -120 || f.x > 1200 || (!ambientScroll.active && (f.y < -150 || f.y > 2050))){
       f.el.remove();
       fishes.splice(i, 1);
     }
@@ -1214,7 +1538,7 @@ function tick(now){
     b.sway += 0.03 * factor;
     b.el.style.top = b.y + 'px';
     b.el.style.left = (b.x + Math.sin(b.sway) * 12) + 'px';
-    if (b.y < 740){
+    if (!ambientScroll.active && b.y < (G.inRound ? -180 : 740)){
       b.el.remove();
       bubbles.splice(j, 1);
     }
@@ -1230,7 +1554,9 @@ requestAnimationFrame(tick);
 
 /* ===== 開場 ===== */
 updateSoundLabel();
+scheduleSeagull();
 refresh();
+seedAmbient(6, 14);   // 一進遊戲畫面裡就有魚和泡泡，不用等牠們慢慢長出來
 </script>
 </body>
 </html>
