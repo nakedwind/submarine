@@ -765,7 +765,7 @@
       0 0 34px rgba(255,210,70,0.7);
     white-space: nowrap;
   }
-  #winBox.show { animation: winBoxPop 3.2s ease forwards; }
+  #winBox.show { animation: winBoxPop 5.2s ease forwards; }
   @keyframes winBoxPop {
     0%   { transform: translateX(-50%) scale(0.65); opacity: 0; }
     8%   { transform: translateX(-50%) scale(1.05); opacity: 1; }
@@ -953,19 +953,24 @@ var sounds = {
   explosion: new Audio('music/explosion.mp3'),
   bonus: new Audio('music/cartoon-music-game-sfx-video-game-bonus.mp3'),
   titanic: new Audio('music/鐵達尼號.mp3'),
+  titanicIntro: new Audio('music/titanic (mp3cut.net).mp3'),
   findShip: new Audio('music/找到船.mp3'),
+  heartbeat: new Audio('music/heartbeat-01.mp3'),
   seagull1: new Audio('music/sound_garage-seagulls01.mp3'),
   seagull2: new Audio('music/sound_garage-seagulls02.mp3')
 };
 sounds.explosion.volume = 0.7;
 sounds.bonus.volume = 0.6;
 sounds.titanic.volume = 0.8;
+sounds.titanicIntro.volume = 0;
 sounds.findShip.volume = 0.8;
+sounds.heartbeat.volume = 0;
 sounds.seagull1.volume = 0.275;
 sounds.seagull2.volume = 0.275;
 sounds.music.loop = true;
 sounds.surface.loop = true;
 sounds.deep.loop = true;
+sounds.heartbeat.loop = true;
 sounds.music.volume = 0.15;
 sounds.surface.volume = 0.495;
 sounds.deep.volume = 0;
@@ -994,6 +999,7 @@ function initAudioGraph(){
 var muffleReady = false;   // 真濾波器是否已接上
 var musicFilter = null;
 var musicFilter2 = null;
+var titanicIntroFadeTimer = null;
 
 function setupMuffle(){
   if (muffleReady) return;
@@ -1075,6 +1081,7 @@ function setSound(on){
     unlockAudio();
     updateAmbience(G.level > 0);
   } else {
+    clearInterval(titanicIntroFadeTimer);
     Object.keys(sounds).forEach(function(key){ sounds[key].pause(); });
   }
 }
@@ -1087,6 +1094,7 @@ function updateAmbience(underwater){
   sounds.surface.volume = underwater ? 0.09 : 0.495;
   sounds.deep.volume = underwater ? 0.42 : 0;
   if (underwater) stopSeagulls();
+  updateHeartbeat(G.level);
 }
 
 /* ===== 海鷗：只在潛水艇停留水面時，以隨機間隔播放兩種叫聲 ===== */
@@ -1113,6 +1121,30 @@ function playDiveSound(){
   if (!soundOn || !audioUnlocked) return;
   sounds.dive.currentTime = 0;
   safePlay(sounds.dive);
+}
+function heartbeatVolumeForLevel(level){
+  if (level < 5 || level > 9) return 0;
+  return 0.34 + (level - 5) * 0.1525;   // 第5階小聲，第9階最大約 0.95
+}
+function updateHeartbeat(level){
+  var hb = sounds.heartbeat;
+  if (!hb) return;
+  var vol = heartbeatVolumeForLevel(level);
+  if (!soundOn || !audioUnlocked || vol <= 0){
+    hb.pause();
+    hb.currentTime = 0;
+    hb.volume = 0;
+    return;
+  }
+  hb.volume = vol;
+  safePlay(hb);
+}
+function stopHeartbeat(){
+  var hb = sounds.heartbeat;
+  if (!hb) return;
+  hb.pause();
+  hb.currentTime = 0;
+  hb.volume = 0;
 }
 function playTone(frequency, duration, type){
   if (!soundOn || !audioUnlocked) return;
@@ -1249,7 +1281,7 @@ function showMessage(text, bad){
   m.classList.add('show');
 }
 
-var WIN_BOX_DURATION = 3200;   // WIN 得分框＋壓黑層的顯示時間（需和 CSS 動畫秒數同步）
+var WIN_BOX_DURATION = 5200;   // WIN 得分框＋壓黑層的顯示時間（需和 CSS 動畫秒數同步）
 var winAmountAnimId = 0;
 function animateWinAmount(target){
   winAmountAnimId++;
@@ -1371,6 +1403,23 @@ function playTitanicSound(){
   if (!soundOn || !audioUnlocked) return;
   sounds.titanic.currentTime = 0;
   safePlay(sounds.titanic);
+}
+
+function playTitanicIntroSound(){
+  if (!soundOn || !audioUnlocked) return;
+  var audio = sounds.titanicIntro;
+  clearInterval(titanicIntroFadeTimer);
+  audio.pause();
+  audio.currentTime = 0;
+  audio.volume = 0;
+  safePlay(audio);
+  var target = 0.8;
+  var start = Date.now();
+  titanicIntroFadeTimer = setInterval(function(){
+    var t = Math.min(1, (Date.now() - start) / 3000);
+    audio.volume = target * t;
+    if (t >= 1) clearInterval(titanicIntroFadeTimer);
+  }, 50);
 }
 
 function playFindShipSound(){
@@ -1690,6 +1739,7 @@ function finalDive(ms){
    鐵達尼號（第 10 層大獎）：從畫面底部升起＋鏡頭拉遠
    ===================================================================== */
 function showTitanic(ms){
+  stopHeartbeat();   // 找到鐵達尼號時，深水心跳停止
   var t = $('titanic');
   t.style.transition = 'top ' + (ms * 1.6) + 'ms ease-in-out, transform ' + (ms * 1.6) + 'ms ease-in-out';
   t.style.top = '60px';                     // 升到定位：桅杆在畫面上段
@@ -1808,6 +1858,7 @@ function doSpin(){
   var totalMs = isFinal ? ms * FINAL_PHASE_MULT * 3 : ms;
 
   if (isFinal){
+    playTitanicIntroSound();
     finalDive(ms);   // 三段式演出：捲兩次礁岩 → 礁岩淡出 → 鐵達尼號登場
   } else if (nextLevel >= 2){
     // 第一次下潛礁岩正在從畫面下方升上來，不捲動；第二層開始每按一次 SPIN 循環一張
@@ -1818,11 +1869,12 @@ function doSpin(){
       playTone(520 + nextLevel * 35, 0.18, 'sine');
       G.level = nextLevel;
       G.win = bet * CONFIG.multipliers[G.level - 1];
+      updateHeartbeat(G.level);
       if (G.level >= CONFIG.maxLevel){
         // 潛到最深層：直接把獎金全收
         playFindShipSound();
         showMessage('抵達海底！');
-        setTimeout(function(){ cashOut(1); }, 3000);   // 停 3 秒，讓玩家看見鐵達尼號後接得分動畫
+        setTimeout(function(){ cashOut(1); }, 4000);   // 停 4 秒，讓玩家看見鐵達尼號後接得分動畫
       }
       G.busy = false;
       refresh();
@@ -1852,6 +1904,7 @@ function playExplosionSound(){
 }
 
 function explodeSub(){
+  stopHeartbeat();
   playExplosionSound();
   // 潛水艇炸掉，頭燈的光束和光暈一起熄滅
   $('beam').classList.remove('show');
@@ -1985,6 +2038,7 @@ function returnTimeFromDepth(level){
 /* ===== 一局結束：潛水艇浮回水面 ===== */
 function endRound(returnFromLevel){
   cancelDecisionCountdown();   // 保險：回水面時一定沒有倒數
+  stopHeartbeat();
   var depth = returnFromLevel || G.level || 1;
   var returnMs = returnTimeFromDepth(depth);
   pendingReturnDepth = depth;
@@ -2053,6 +2107,7 @@ $('btnTest').addEventListener('click', function(){
   chest.style.transition = 'none';
   chest.style.transform  = 'translateY(-' + chestOff + 'px)';
   moveSubTo(9, 0, null);   // 背景、海面、濾鏡、潛水艇姿態、探照燈一次到位
+  updateHeartbeat(9);
 
   showMessage('已跳到第 9 層');
   refresh();
