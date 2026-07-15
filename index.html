@@ -1853,6 +1853,9 @@ function playExplosionSound(){
 
 function explodeSub(){
   playExplosionSound();
+  // 潛水艇炸掉，頭燈的光束和光暈一起熄滅
+  $('beam').classList.remove('show');
+  $('beamGlow').classList.remove('show');
   var fx = $('fxLayer');
   // 爆炸中心 = 潛水艇目前的中心
   var cx = sub.offsetLeft + sub.offsetWidth / 2;
