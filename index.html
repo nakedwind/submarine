@@ -260,10 +260,20 @@
   }
   #chestStrip .chest {
     position: absolute;
+    animation: chestGlow 2.2s ease-in-out infinite;   /* 金色光暈呼吸發亮 */
     left: 222px;               /* 平台中心置中（軌道左移 60，這裡 +60 補回，畫面位置不變） */
     transform: translateX(-50%);
     width: auto;               /* 使用 Treasure01～09 各自的原始尺寸 */
     height: auto;
+  }
+  /* 寶箱發亮：圖片本身變亮＋金色光暈，由弱到強來回呼吸 */
+  @keyframes chestGlow {
+    0%, 100% { filter: brightness(1) saturate(1)
+                       drop-shadow(0 0 10px rgba(255, 216, 120, 0.45))
+                       drop-shadow(0 0 24px rgba(255, 190, 80, 0.25)); }
+    50%      { filter: brightness(1.35) saturate(1.15)
+                       drop-shadow(0 0 18px rgba(255, 226, 140, 0.95))
+                       drop-shadow(0 0 46px rgba(255, 200, 90, 0.55)); }
   }
 
   /* ===== 深度濾鏡：越潛越深，畫面蓋上越濃的深藍黑（色彩增值） ===== */
