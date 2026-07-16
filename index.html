@@ -360,7 +360,6 @@
 
   /* ===== 測試用按鈕（右上角） ===== */
   #btnTest {
-    display: none;   /* 發佈版隱藏測試按鈕；要再用時把這行刪掉即可 */
     position: absolute;
     right: 20px; top: 30px;
     z-index: 100;
@@ -1123,8 +1122,12 @@ function playDiveSound(){
   safePlay(sounds.dive);
 }
 function heartbeatVolumeForLevel(level){
-  if (level < 5 || level > 9) return 0;
-  return 0.34 + (level - 5) * 0.1525;   // 第5階小聲，第9階最大約 0.95
+  if (level < 4 || level > 9) return 0;
+  return 0.25 + (level - 4) * 0.14;   // 第4階小聲，第9階最大約 0.95
+}
+function heartbeatRateForLevel(level){
+  if (level < 4 || level > 9) return 1;
+  return 1 + (level - 4) * 0.09;   // 第4階原速，第9階約 1.45 倍速
 }
 function updateHeartbeat(level){
   var hb = sounds.heartbeat;
@@ -1137,6 +1140,7 @@ function updateHeartbeat(level){
     return;
   }
   hb.volume = vol;
+  hb.playbackRate = heartbeatRateForLevel(level);
   safePlay(hb);
 }
 function stopHeartbeat(){
@@ -1145,6 +1149,7 @@ function stopHeartbeat(){
   hb.pause();
   hb.currentTime = 0;
   hb.volume = 0;
+  hb.playbackRate = 1;
 }
 function playTone(frequency, duration, type){
   if (!soundOn || !audioUnlocked) return;
@@ -1416,7 +1421,7 @@ function playTitanicIntroSound(){
   var target = 0.8;
   var start = Date.now();
   titanicIntroFadeTimer = setInterval(function(){
-    var t = Math.min(1, (Date.now() - start) / 6000);
+    var t = Math.min(1, (Date.now() - start) / 8000);
     audio.volume = target * t;
     if (t >= 1) clearInterval(titanicIntroFadeTimer);
   }, 50);
@@ -1711,7 +1716,7 @@ function finalDive(ms){
   // 淡出用「延遲 2p 開始」的過渡自動接上，不會中途重設動畫
   reefOff  += SCROLL_STEP * 3;
   chestOff += SCROLL_STEP * 3;
-  scrollAmbient(-SCROLL_STEP * 3, total);
+  scrollAmbient(-SCROLL_STEP * 3, total * 0.6, true);   // 魚和泡泡捲快一點；最終下潛不補新魚群
   var strips = [$('reefStrip'), $('chestStrip')];
   var offs = [reefOff, chestOff];
   for (var i = 0; i < strips.length; i++){
@@ -1742,7 +1747,8 @@ function showTitanic(ms){
   stopHeartbeat();   // 找到鐵達尼號時，深水心跳停止
   var t = $('titanic');
   t.style.transition = 'top ' + (ms * 1.6) + 'ms ease-in-out, transform ' + (ms * 1.6) + 'ms ease-in-out';
-  t.style.top = '60px';                     // 升到定位：桅杆在畫面上段
+  t.style.top = '10px';                     // 升到定位：桅杆在畫面上段
+  $('prizePanel').src = 'image/UI-box02.png';   // 找到鐵達尼號：換成慶祝版面板
   t.style.transform = 'scale(1.1112)';      // 130% → 100%（換算鏡頭縮小後剛好填滿畫面）
   $('world').classList.add('zoomout');      // 鏡頭拉遠
 }
@@ -1753,6 +1759,7 @@ function hideTitanic(ms){
   t.style.top = '2450px';                   // 沉回畫面底下（含 130% 縮放的餘裕）
   t.style.transform = 'scale(1.4445)';      // 恢復登場前的起始大小
   $('world').classList.remove('zoomout');   // 鏡頭恢復
+  $('prizePanel').src = 'image/UI-box.png'; // 面板換回平常的版本
 }
 
 /* =====================================================================
@@ -1856,6 +1863,7 @@ function doSpin(){
   // 9→10 的最終下潛：時間拉長 3 倍的特別演出
   var isFinal = nextLevel >= CONFIG.maxLevel;
   var totalMs = isFinal ? ms * FINAL_PHASE_MULT * 3 : ms;
+  G.seedLevel = nextLevel;   // 預先生成的魚群用「即將抵達」層數的魚種組合
 
   if (isFinal){
     playTitanicIntroSound();
@@ -1874,7 +1882,7 @@ function doSpin(){
         // 潛到最深層：直接把獎金全收
         playFindShipSound();
         showMessage('抵達海底！');
-        setTimeout(function(){ cashOut(1); }, 4000);   // 停 4 秒，讓玩家看見鐵達尼號後接得分動畫
+        setTimeout(function(){ cashOut(1); }, 3500);   // 停 3.5 秒，讓玩家看見鐵達尼號後接得分動畫
       }
       G.busy = false;
       refresh();
@@ -2039,6 +2047,7 @@ function returnTimeFromDepth(level){
 function endRound(returnFromLevel){
   cancelDecisionCountdown();   // 保險：回水面時一定沒有倒數
   stopHeartbeat();
+  G.seedLevel = 0;             // 回水面：魚種組合回到水面狀態
   var depth = returnFromLevel || G.level || 1;
   var returnMs = returnTimeFromDepth(depth);
   pendingReturnDepth = depth;
@@ -2206,30 +2215,83 @@ var fishes = [];
 var bubbles = [];
 var lastTime = performance.now();
 
-function spawnFish(inField, yShift){
+/* ===== 魚種表：每種魚只出現在指定的層數範圍（min~max 層）
+   speed = [最慢, 最快]、scale = [最小, 最大]、weight = 抽中的權重
+   jelly = true 代表水母：不左右翻轉、緩緩往上飄＋左右搖曳 ===== */
+var FISH_TYPES = [
+  { src: 'fishs01.png',     w: 71,  min: 0, max: 10, speed: [0.6, 1.8], scale: [0.6, 1.5], weight: 3 },
+  { src: 'fishs02.png',     w: 71,  min: 0, max: 10, speed: [0.6, 1.8], scale: [0.6, 1.5], weight: 3 },
+  { src: 'seaturtle.png',   w: 237, min: 3, max: 6,  speed: [0.3, 0.7], scale: [0.7, 1.1], weight: 2.2 },
+  { src: 'jellyfish.png',   w: 70,  min: 5, max: 9,  speed: [0.1, 0.25], scale: [0.8, 1.6], weight: 4.5, jelly: true },
+  { src: 'shark.png',       w: 365, min: 7, max: 9,  speed: [1.1, 2.0], scale: [0.8, 1.2], weight: 5.5 },
+  { src: 'lanternfish.png', w: 157, min: 8, max: 9,  speed: [0.4, 0.9], scale: [0.7, 1.2], weight: 5.5 },
+  { src: 'oarfish.png',     w: 731, min: 8, max: 9,  speed: [0.5, 0.9], scale: [0.7, 1.0], weight: 4.5 }
+];
+function pickFishType(){
+  // 依目前層數篩選可出現的魚種，再按權重隨機抽一種
+  // seedLevel = 下潛中「即將抵達」的層數，預先生成的魚要用新層數的魚種
+  var lv = G.inRound ? Math.max(G.level, G.seedLevel || 0) : 0;
+  var pool = [];
+  var totalW = 0;
+  var weights = [];
+  for (var i = 0; i < FISH_TYPES.length; i++){
+    var t = FISH_TYPES[i];
+    if (lv >= t.min && lv <= t.max){
+      var w = t.weight;
+      if (t.jelly) w += Math.max(0, lv - 5) * 2.0;   // 水母越深越多（第5層基本量，之後每層遞增）
+      pool.push(t); weights.push(w); totalW += w;
+    }
+  }
+  var r = Math.random() * totalW;
+  for (var j = 0; j < pool.length; j++){
+    r -= weights[j];
+    if (r <= 0) return pool[j];
+  }
+  return pool[pool.length - 1] || FISH_TYPES[0];
+}
+
+function spawnFish(inField, yShift, forceSrc){
   // inField = true：直接出現在畫面內（開場、捲動後補魚用）
   //           false／不填：從畫面左右兩側游進來（平常的自然生成）
   // yShift：整體垂直偏移，用來預先生成在畫面下方等著被捲進來
+  // forceSrc：指定魚種檔名（例如水母加量器直接指定 jellyfish.png）
+  var type = null;
+  if (forceSrc){
+    for (var ti = 0; ti < FISH_TYPES.length; ti++){
+      if (FISH_TYPES[ti].src === forceSrc){ type = FISH_TYPES[ti]; break; }
+    }
+  }
+  if (!type) type = pickFishType();
   var img = document.createElement('img');
   var toRight = Math.random() < 0.5;
-  img.src = 'image/' + (Math.random() < 0.5 ? 'fishs01.png' : 'fishs02.png');
+  img.src = 'image/' + type.src;
   img.className = 'fish';
-  var scale = 0.6 + Math.random() * 0.9;
+  var scale = type.scale[0] + Math.random() * (type.scale[1] - type.scale[0]);
+  var drawW = type.w * scale;
   // 下潛後魚群可游過整個畫面；水面時只出現在海面以下。
   var y = G.inRound ? 60 + Math.random() * 1740 : 820 + Math.random() * 900;
   y += (yShift || 0);   // 預先生成在畫面外（捲動時會被捲進來）
   var f = {
     el: img,
-    x: inField ? 60 + Math.random() * 960 : (toRight ? -90 : 1170),
+    // 從側邊進場時，起點要退到「自己的寬度」之外（大魚如皇帶魚很寬）
+    x: inField ? 60 + Math.random() * 960 : (toRight ? -(drawW + 20) : 1170),
     y: y,
-    speed: (0.6 + Math.random() * 1.2) * (toRight ? 1 : -1),
+    speed: (type.speed[0] + Math.random() * (type.speed[1] - type.speed[0])) * (toRight ? 1 : -1),
+    w: drawW,
     scale: scale
   };
-  img.style.width = (71 * scale) + 'px';
+  if (type.jelly){
+    // 水母：幾乎不橫移，緩緩上飄＋左右搖曳，且不翻轉
+    f.speed = f.speed * 0.3;
+    f.vy = -(0.15 + Math.random() * 0.25);
+    f.sway = Math.random() * Math.PI * 2;
+    f.baseX = f.x;
+  }
+  img.style.width = drawW + 'px';
   img.style.left = f.x + 'px';   // 生成當下就定位，避免在畫面左緣閃現一幀
   img.style.top = y + 'px';
-  // 素材的魚頭朝左；往右游要左右翻轉
-  img.style.transform = toRight ? 'scaleX(-1)' : '';
+  // 素材的魚頭都朝左；往右游要左右翻轉（水母除外）
+  img.style.transform = (!type.jelly && toRight) ? 'scaleX(-1)' : '';
   $('fishLayer').appendChild(img);
   fishes.push(f);
 }
@@ -2259,9 +2321,21 @@ function spawnBubble(inField, yShift){
 /* ===== 一次補一批魚和泡泡（開場用、或預先生成在畫面下方等被捲進來） =====
    上限放寬一點：預先生成時畫面上的舊魚還沒被捲走，兩批會短暫共存，
    捲動結束後舊的會被清掉，數量就回到正常。 */
+/* ===== 水母加量器：從畫面底部生成一隻水母，加快上升速度飄進畫面 ===== */
+function spawnBoostJelly(){
+  spawnFish(true, 0, 'jellyfish.png');
+  var f = fishes[fishes.length - 1];
+  if (!f) return;
+  f.y = 1950 + Math.random() * 200;          // 出生在畫面底部下方
+  f.vy = -(0.5 + Math.random() * 0.6);       // 升速比一般水母快，才進得了畫面
+  f.x = 60 + Math.random() * 960;
+  f.el.style.top = f.y + 'px';
+  f.el.style.left = f.x + 'px';
+}
+
 function seedAmbient(nFish, nBubbles, yShift){
   for (var i = 0; i < nFish; i++){
-    if (fishes.length < 14) spawnFish(true, yShift);
+    if (fishes.length < 30) spawnFish(true, yShift);   // 上限要比水母的高，混合魚群才一定補得進來
   }
   for (var j = 0; j < nBubbles; j++){
     if (bubbles.length < 40) spawnBubble(true, yShift);
@@ -2271,12 +2345,21 @@ function seedAmbient(nFish, nBubbles, yShift){
 /* ===== 場景捲動時，魚和泡泡跟著被捲動 =====
    捲動的進度曲線用跟礁岩一樣的 ease-in-out，看起來完全同步 */
 var ambientScroll = { active: false, amount: 0, dur: 0, t: 0, applied: 0 };
-function scrollAmbient(amount, ms){
+function scrollAmbient(amount, ms, noSeed){
   ambientScroll = { active: true, amount: amount, dur: ms, t: 0, applied: 0 };
+  if (noSeed) return;   // 9→10 最終下潛：不補新魚群，讓海底淨空給鐵達尼號
   if (amount < 0){
     // 下潛：先把下一批魚和泡泡生成在畫面下方（偏移 = 捲動距離），
     // 捲動時它們跟著整個場景一起被捲進畫面，不會憑空冒出來
-    seedAmbient(4, 8, -amount);
+    seedAmbient(G.inRound ? 9 : 4, 8, -amount);   // 下潛時多補一些，畫面才不會越潛越空
+    // 第 5 層起：額外預先生成一批水母（一起被捲進畫面，下捲完成馬上看得到）
+    var lv = G.inRound ? Math.max(G.level, G.seedLevel || 0) : 0;
+    if (lv >= 5){
+      var extra = 2 + (lv - 5);   // 第5層+2隻 → 第9層+6隻
+      for (var e = 0; e < extra; e++){
+        if (fishes.length < 26) spawnFish(true, -amount, 'jellyfish.png');
+      }
+    }
   } else {
     // 浮回水面：新內容從畫面上方進來會穿過天空，不好看，改成捲完再補
     setTimeout(function(){ seedAmbient(4, 8, 0); }, ms + 80);
@@ -2312,9 +2395,19 @@ function tick(now){
   for (var i = fishes.length - 1; i >= 0; i--){
     var f = fishes[i];
     f.x += f.speed * factor;
-    f.el.style.left = f.x + 'px';
-    // 捲動中暫停「超出上下界就清除」，預先生成在畫面下方的魚才不會被誤刪
-    if (f.x < -120 || f.x > 1200 || (!ambientScroll.active && (f.y < -150 || f.y > 2050))){
+    if (f.vy){
+      // 水母：緩緩上飄＋左右搖曳
+      f.y += f.vy * factor;
+      f.sway += 0.02 * factor;
+      f.el.style.top = f.y + 'px';
+      f.el.style.left = (f.x + Math.sin(f.sway) * 18) + 'px';
+    } else {
+      f.el.style.left = f.x + 'px';
+    }
+    // 出界清除：左右界限依「自己的寬度」放寬（皇帶魚等大魚才不會半路消失）
+    var margin = (f.w || 120) + 60;
+    if (f.x < -margin || f.x > 1080 + margin ||
+        (!ambientScroll.active && (f.y < -200 || f.y > 2050))){
       f.el.remove();
       fishes.splice(i, 1);
     }
@@ -2333,8 +2426,20 @@ function tick(now){
   }
 
   // 隨機生出新的魚和泡泡（機率也乘上幀率校正）
-  if (Math.random() < 0.012 * factor && fishes.length < 8) spawnFish();
-  if (Math.random() < 0.03 * factor && bubbles.length < 25) spawnBubble();
+  // 下潛中魚的生成率和數量上限都提高（深海生物較多）。
+  // 捲動進行中暫停自然生成：中途出生的魚吃不到完整捲動量，
+  // 會像定在原地跟著潛水艇下潛，很出戲（捲動時已有預先補魚機制）。
+  // 最終下潛（9→10 到浮回水面前）完全不生成新魚群，讓海底留給鐵達尼號
+  if (!ambientScroll.active && !inFinalDive){
+    if (Math.random() < (G.inRound ? 0.028 : 0.012) * factor && fishes.length < (G.inRound ? 17 : 8)) spawnFish();
+    // 水母加量：第 5 層以下額外從畫面底部生成水母升上來，越深機率越高。
+    // 水母會久留畫面，上限設低（18），才不會把其他魚的生成空間全占滿
+    if (G.inRound && G.level >= 5 && fishes.length < 18 &&
+        Math.random() < (0.012 + (G.level - 5) * 0.005) * factor){
+      spawnBoostJelly();
+    }
+    if (Math.random() < 0.03 * factor && bubbles.length < 25) spawnBubble();
+  }
 
   requestAnimationFrame(tick);
 }
