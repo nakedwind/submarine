@@ -22,6 +22,8 @@
     width: 1080px; height: 1920px;
     left: 50%; top: 50%;
     transform-origin: center center;
+    z-index: 0;
+    isolation: isolate;
     overflow: hidden;   /* 遮罩：超出 1080x1920 舞台的東西一律裁掉 */
     /* 實際縮放比例由 JS 計算 */
   }
@@ -314,9 +316,26 @@
   .boomWhite {
     position: absolute; left: 0; top: 0;
     width: 1080px; height: 1920px;
+    z-index: 89;                  /* 掛在 stage 上：蓋住整個場景，但不壓過 UI */
     background: #fff;
     opacity: 0.65;
     transition: opacity 0.45s ease-out;
+    pointer-events: none;
+  }
+  .boomScreenFlash {
+    position: absolute; left: 0; top: 0;
+    width: 1080px; height: 1920px;
+    z-index: 89;                  /* 全舞台爆炸光，不受 world zoomout 縮放 */
+    background: radial-gradient(circle at 50% 44%,
+      rgba(255,255,255,0.95),
+      rgba(255,235,165,0.78) 22%,
+      rgba(255,150,70,0.45) 48%,
+      rgba(255,120,40,0) 78%);
+    mix-blend-mode: screen;
+    opacity: 0.9;
+    transform: scale(0.96);
+    transition: transform 0.8s ease-out, opacity 0.95s ease-out;
+    pointer-events: none;
   }
   .boomRing {
     position: absolute;
@@ -359,7 +378,7 @@
   .bubble { position: absolute; }
 
   /* ===== 測試用按鈕（右上角） ===== */
-  #btnTest {
+  #btnTest, #btnTestFail {
     position: absolute;
     right: 20px; top: 30px;
     z-index: 100;
@@ -371,7 +390,8 @@
     padding: 10px 20px;
     cursor: pointer;
   }
-  #btnTest:active { filter: brightness(1.3); }
+  #btnTestFail { top: 110px; background: rgba(90, 40, 160, 0.85); border-color: #c9a0ff; }
+  #btnTest:active, #btnTestFail:active { filter: brightness(1.3); }
 
   /* ===== 左上角：玩家資訊與餘額 ===== */
   #topBar {
@@ -834,8 +854,9 @@
   <div id="fxLayer"></div>
   </div><!-- /world -->
 
-  <!-- 測試用按鈕：跳到第9層，下一次SPIN必成功（正式上線前把這顆和相關程式拿掉） -->
+  <!-- 測試用按鈕：跳到第9層（正式上線前把這兩顆和相關程式拿掉） -->
   <div id="btnTest">測試 9→10</div>
+  <div id="btnTestFail">測試 9→10 失敗</div>
 
   <div id="topBar">
     <div class="name">DEMO PLAYER</div>
@@ -999,6 +1020,7 @@ var muffleReady = false;   // 真濾波器是否已接上
 var musicFilter = null;
 var musicFilter2 = null;
 var titanicIntroFadeTimer = null;
+var titanicIntroFadeOutTimer = null;
 
 function setupMuffle(){
   if (muffleReady) return;
@@ -1081,6 +1103,7 @@ function setSound(on){
     updateAmbience(G.level > 0);
   } else {
     clearInterval(titanicIntroFadeTimer);
+    clearTimeout(titanicIntroFadeOutTimer);
     Object.keys(sounds).forEach(function(key){ sounds[key].pause(); });
   }
 }
@@ -1414,6 +1437,7 @@ function playTitanicIntroSound(){
   if (!soundOn || !audioUnlocked) return;
   var audio = sounds.titanicIntro;
   clearInterval(titanicIntroFadeTimer);
+  clearTimeout(titanicIntroFadeOutTimer);
   audio.pause();
   audio.currentTime = 0;
   audio.volume = 0;
@@ -1425,6 +1449,32 @@ function playTitanicIntroSound(){
     audio.volume = target * t;
     if (t >= 1) clearInterval(titanicIntroFadeTimer);
   }, 50);
+}
+
+function fadeOutTitanicIntroSound(duration){
+  var audio = sounds.titanicIntro;
+  if (!audio) return;
+  clearInterval(titanicIntroFadeTimer);
+  clearTimeout(titanicIntroFadeOutTimer);
+  var startVol = audio.volume;
+  var start = Date.now();
+  duration = duration || 1500;
+  titanicIntroFadeTimer = setInterval(function(){
+    var t = Math.min(1, (Date.now() - start) / duration);
+    audio.volume = startVol * (1 - t);
+    if (t >= 1){
+      clearInterval(titanicIntroFadeTimer);
+      audio.pause();
+      audio.volume = 0;
+    }
+  }, 50);
+}
+
+function scheduleTitanicIntroFailFadeOut(){
+  clearTimeout(titanicIntroFadeOutTimer);
+  titanicIntroFadeOutTimer = setTimeout(function(){
+    fadeOutTitanicIntroSound(1500);
+  }, 11000);
 }
 
 function playFindShipSound(){
@@ -1856,7 +1906,8 @@ function doSpin(){
   var ms = G.turbo ? CONFIG.diveTime / 2 : CONFIG.diveTime;
   var nextLevel = G.level + 1;
   var ok = Math.random() < CONFIG.successChance[nextLevel - 1];
-  if (G.testForceWin){ ok = true; G.testForceWin = false; }   // 測試按鈕：下一潛必成功
+  if (G.testForceWin){ ok = true; G.testForceWin = false; }    // 測試按鈕：下一潛必成功
+  if (G.testForceLose){ ok = false; G.testForceLose = false; } // 測試按鈕：下一潛必失敗
 
   setUnderwaterDepth(nextLevel);   // 音樂跟著變悶
 
@@ -1867,6 +1918,7 @@ function doSpin(){
 
   if (isFinal){
     playTitanicIntroSound();
+    if (!ok) scheduleTitanicIntroFailFadeOut();
     finalDive(ms);   // 三段式演出：捲兩次礁岩 → 礁岩淡出 → 鐵達尼號登場
   } else if (nextLevel >= 2){
     // 第一次下潛礁岩正在從畫面下方升上來，不捲動；第二層開始每按一次 SPIN 循環一張
@@ -1923,11 +1975,20 @@ function explodeSub(){
   var cy = sub.offsetTop + sub.offsetHeight / 2;
 
   // 0. 全畫面白閃＋舞台震動
+  var stage = $('stage');
   var white = document.createElement('div');
   white.className = 'boomWhite';
-  fx.appendChild(white);
+  stage.appendChild(white);
   requestAnimationFrame(function(){ white.style.opacity = '0'; });
-  var stage = $('stage');
+  setTimeout(function(){ white.remove(); }, 520);
+  var screenFlash = document.createElement('div');
+  screenFlash.className = 'boomScreenFlash';
+  stage.appendChild(screenFlash);
+  requestAnimationFrame(function(){
+    screenFlash.style.transform = 'scale(1.08)';
+    screenFlash.style.opacity = '0';
+  });
+  setTimeout(function(){ screenFlash.remove(); }, 1050);
   stage.classList.add('shaking');
   setTimeout(function(){ stage.classList.remove('shaking'); }, 850);
 
@@ -2093,8 +2154,9 @@ $('btnAuto').addEventListener('click', function(){
   this.classList.toggle('on', G.auto);
   if (G.auto && !G.busy) doSpin();
 });
-/* ===== 測試按鈕：直接跳到第 9 層，下一次 SPIN 必成功（看 9→10 的表演） ===== */
-$('btnTest').addEventListener('click', function(){
+/* ===== 測試按鈕：直接跳到第 9 層（正式上線前記得隱藏）
+   forceWin = true 下一潛必成功；false 下一潛必失敗（看爆炸） ===== */
+function testJumpToLevel9(forceWin){
   if (G.busy) return;
   playButtonSound('menu');
   var bet = CONFIG.betOptions[G.betIndex];
@@ -2105,7 +2167,8 @@ $('btnTest').addEventListener('click', function(){
   G.inRound = true;
   G.level = 9;
   G.win = bet * CONFIG.multipliers[8];
-  G.testForceWin = true;
+  G.testForceWin = forceWin;
+  G.testForceLose = !forceWin;
 
   // 場景瞬間定位到第 9 層的狀態（不播動畫）
   reefOff  = 8 * SCROLL_STEP;   // 第 2~9 層共捲了 8 次
@@ -2118,9 +2181,11 @@ $('btnTest').addEventListener('click', function(){
   moveSubTo(9, 0, null);   // 背景、海面、濾鏡、潛水艇姿態、探照燈一次到位
   updateHeartbeat(9);
 
-  showMessage('已跳到第 9 層');
+  showMessage(forceWin ? '已跳到第 9 層（下一潛必成功）' : '已跳到第 9 層（下一潛必失敗）');
   refresh();
-});
+}
+$('btnTest').addEventListener('click', function(){ testJumpToLevel9(true); });
+$('btnTestFail').addEventListener('click', function(){ testJumpToLevel9(false); });
 
 /* ===== 漢堡選單 ===== */
 $('btnMenu').addEventListener('click', function(e){
