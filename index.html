@@ -41,6 +41,8 @@
      鏡頭拉遠時用反向放大抵銷縮小，看起來就像沒有跟著縮 */
   #depthTint { transform-origin: 50% 42%; }
   #world.zoomout #depthTint { transform: scale(1.1112); }
+  /* 爆炸的全畫面白閃也一樣：鏡頭拉遠時反向放大，才能蓋滿整個畫面不露邊 */
+  #world.zoomout .boomWhite { transform: scale(1.1112); transform-origin: 50% 42%; }
   #stage { background: #051428; }           /* 拉遠時邊緣露出的底色（深海色） */
 
   /* ===== 鐵達尼號：最深層的大獎，平常藏在畫面底下 ===== */
@@ -280,8 +282,9 @@
 
   /* ===== 深度濾鏡：越潛越深，畫面蓋上越濃的深藍黑（色彩增值） ===== */
   #depthTint {
-    position: absolute; left: 0; top: 0;
-    width: 1080px; height: 1920px;
+    /* 四周各多出 70px：爆炸震動（最大 ±34px）和鏡頭縮放時邊緣都不會露出亮條 */
+    position: absolute; left: -70px; top: -70px;
+    width: 1220px; height: 2060px;
     background: #061228;
     mix-blend-mode: multiply;
     opacity: 0;
@@ -289,11 +292,12 @@
     pointer-events: none;
   }
 
-  /* ===== 爆炸特效層（蓋在場景上、按鈕之下） ===== */
+  /* ===== 爆炸特效層（蓋在場景上、按鈕之下） =====
+     注意：不能設 overflow: hidden——鏡頭拉遠時裁切框會跟著縮小，
+     火球的光會被裁出一圈空隙。超出畫面的部分交給 stage 裁切即可。 */
   #fxLayer {
     position: absolute; left: 0; top: 0;
     width: 1080px; height: 1920px;
-    overflow: hidden;
     pointer-events: none;
   }
   .boomFlash {
@@ -329,11 +333,12 @@
     background: radial-gradient(circle at 50% 44%,
       rgba(255,255,255,0.95),
       rgba(255,235,165,0.78) 22%,
-      rgba(255,150,70,0.45) 48%,
-      rgba(255,120,40,0) 78%);
+      rgba(255,150,70,0.5) 48%,
+      rgba(255,130,50,0.3) 75%,
+      rgba(255,120,40,0.2) 100%);   /* 最外圈保留暖光，鋪滿整個畫面不露空隙 */
     mix-blend-mode: screen;
     opacity: 0.9;
-    transform: scale(0.96);
+    transform: scale(1.06);   /* 一開始就比畫面大，邊緣不會露出沒被光蓋到的空隙 */
     transition: transform 0.8s ease-out, opacity 0.95s ease-out;
     pointer-events: none;
   }
@@ -356,8 +361,9 @@
     border-radius: 50%;
     transition: transform 0.85s ease-out, opacity 0.85s ease-out;
   }
-  /* 爆炸時整個舞台震動（用 margin 位移，不動到縮放用的 transform） */
-  #stage.shaking { animation: stageShake 0.8s linear; }
+  /* 爆炸時搖「場景容器」而不是整個舞台：背景在容器外靜止不動，
+     搖動時邊緣露出的是背景圖本身，不會露出網頁底色的破綻 */
+  #world.shaking { animation: stageShake 0.8s linear; }
   @keyframes stageShake {
     0%, 100% { margin-left: 0;     margin-top: 0; }
     8%  { margin-left: -34px; margin-top: 22px; }
@@ -379,7 +385,6 @@
 
   /* ===== 測試用按鈕（右上角） ===== */
   #btnTest, #btnTestFail {
-    display: none;
     position: absolute;
     right: 20px; top: 30px;
     z-index: 100;
@@ -1919,7 +1924,6 @@ function doSpin(){
 
   if (isFinal){
     playTitanicIntroSound();
-    if (!ok) scheduleTitanicIntroFailFadeOut();
     finalDive(ms);   // 三段式演出：捲兩次礁岩 → 礁岩淡出 → 鐵達尼號登場
   } else if (nextLevel >= 2){
     // 第一次下潛礁岩正在從畫面下方升上來，不捲動；第二層開始每按一次 SPIN 循環一張
@@ -1943,6 +1947,8 @@ function doSpin(){
       else startDecisionCountdown();   // 開始 8 秒決策倒數，逾時自動下潛
     } else {
       playTone(95, 0.65, 'sawtooth');
+      // 最終下潛失敗：鐵達尼號配樂播到一半，在此刻快速淡出
+      if (isFinal) fadeOutTitanicIntroSound(600);
       // 失敗：搖晃 → 爆炸 → 獎金歸零、浮回水面
       sub.classList.add('shake');
       showMessage('潛航失敗…', true);
@@ -1986,12 +1992,12 @@ function explodeSub(){
   screenFlash.className = 'boomScreenFlash';
   stage.appendChild(screenFlash);
   requestAnimationFrame(function(){
-    screenFlash.style.transform = 'scale(1.08)';
+    screenFlash.style.transform = 'scale(1.2)';   // 從 1.06 往外擴，全程都蓋滿畫面
     screenFlash.style.opacity = '0';
   });
   setTimeout(function(){ screenFlash.remove(); }, 1050);
-  stage.classList.add('shaking');
-  setTimeout(function(){ stage.classList.remove('shaking'); }, 850);
+  $('world').classList.add('shaking');
+  setTimeout(function(){ $('world').classList.remove('shaking'); }, 850);
 
   // 1. 中心閃光火球
   var flash = document.createElement('div');
